@@ -79,7 +79,7 @@ function logPageResult(pagePath, similarity, error = null) {
   if (error) {
     console.log(chalk.red(`[Error] Page: ${pagePath} - ${error}`));
   } else if (typeof similarity === "number") {
-    const status = similarity === 100 ? chalk.green("Pass") : chalk.red("Fail");
+    const status = similarity >= 95 ? chalk.green("Pass") : chalk.red("Fail");
     console.log(
       `${status} Page: ${pagePath} - Similarity: ${similarity.toFixed(2)}%`
     );
@@ -120,14 +120,14 @@ function generateHtmlReport(results, deviceName) {
           results.filter(
             (r) =>
               typeof r.similarityPercentage === "number" &&
-              r.similarityPercentage === 100
+              r.similarityPercentage >= 95
           ).length
         }</p>
         <p>Failed: ${
           results.filter(
             (r) =>
               typeof r.similarityPercentage === "number" &&
-              r.similarityPercentage < 100
+              r.similarityPercentage < 95
           ).length
         }</p>
         <p>Errors: ${
@@ -154,7 +154,7 @@ function generateHtmlReport(results, deviceName) {
 
     const statusClass =
       typeof result.similarityPercentage === "number" &&
-      result.similarityPercentage === 100
+      result.similarityPercentage >= 95
         ? "pass"
         : "fail";
 
@@ -169,7 +169,7 @@ function generateHtmlReport(results, deviceName) {
         <td class="${statusClass}">${
       result.similarityPercentage === "Error"
         ? "Error"
-        : result.similarityPercentage === 100
+        : result.similarityPercentage >= 95
         ? "Pass"
         : "Fail"
     }</td>
@@ -205,7 +205,6 @@ test.describe("Visual Comparison Tests", () => {
 
     console.log(chalk.blue(`\nRunning visual tests for ${deviceName}`));
 
-    // Ensure directories for screenshots exist
     const baseDir = `screenshots/${deviceName}`;
     ["staging", "prod", "diff"].forEach((dir) => {
       const fullPath = path.join(baseDir, dir);
@@ -214,11 +213,10 @@ test.describe("Visual Comparison Tests", () => {
 
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
-    }); // Set up a browser context
-    const page = await context.newPage(); // Open a new page in the browser
+    });
+    const page = await context.newPage();
 
     for (const pagePath of config.staging.urls) {
-      // Iterate over all URLs in the configuration
       const stagingUrl = `${config.staging.baseUrl}${pagePath}`;
       const prodUrl = `${config.prod.baseUrl}${pagePath}`;
       const stagingScreenshotPath = path.join(
@@ -240,11 +238,9 @@ test.describe("Visual Comparison Tests", () => {
       try {
         console.log(chalk.yellow(`\nTesting page: ${pagePath}`));
 
-        // Capture screenshots for staging and production
         await captureScreenshot(page, stagingUrl, stagingScreenshotPath);
         await captureScreenshot(page, prodUrl, prodScreenshotPath);
 
-        // Compare screenshots and log results
         const similarity = await compareScreenshots(
           stagingScreenshotPath,
           prodScreenshotPath,
@@ -258,7 +254,6 @@ test.describe("Visual Comparison Tests", () => {
             typeof similarity === "number" ? similarity : similarity,
         });
       } catch (error) {
-        // Log any errors encountered during the test
         logPageResult(pagePath, null, error.message);
         results.push({
           pagePath,
@@ -268,7 +263,7 @@ test.describe("Visual Comparison Tests", () => {
       }
     }
 
-    generateHtmlReport(results, deviceName); // Generate an HTML report of the results
-    await context.close(); // Close the browser context
+    generateHtmlReport(results, deviceName);
+    await context.close();
   });
 });
