@@ -35,7 +35,6 @@ async function resizeImage(imagePath, width, height) {
 
 // Compare two screenshots and return similarity percentage
 async function compareScreenshots(baselinePath, currentPath, diffPath) {
-  // Resize images to ensure they match the same size before comparison
   await resizeImage(baselinePath, 1280, 800);
   await resizeImage(currentPath, 1280, 800);
 
@@ -63,10 +62,28 @@ async function compareScreenshots(baselinePath, currentPath, diffPath) {
   return (matchedPixels / totalPixels) * 100;
 }
 
-// Capture screenshot for a given URL
+// Capture screenshot for a given URL, force screenshot if stuck
 async function captureScreenshot(page, url, screenshotPath) {
+  const navigationTimeout = 5000; // 5 seconds timeout for detecting being stuck
+  let navigationError = false;
+
   try {
-    await page.goto(url, { waitUntil: "networkidle" });
+    const navigationPromise = page.goto(url, { waitUntil: "networkidle" });
+
+    // Set a timeout to detect being stuck
+    const timeoutPromise = new Promise((resolve) =>
+      setTimeout(() => {
+        navigationError = true;
+        resolve();
+      }, navigationTimeout)
+    );
+
+    await Promise.race([navigationPromise, timeoutPromise]);
+
+    if (navigationError) {
+      console.log(chalk.red(`Timeout detected on ${url}. Forcing screenshot and continuing.`));
+    }
+
     ensureDirectoryExistence(screenshotPath);
     await page.screenshot({ path: screenshotPath, fullPage: true });
   } catch (error) {
@@ -80,13 +97,9 @@ function logPageResult(pagePath, similarity, error = null) {
     console.log(chalk.red(`[Error] Page: ${pagePath} - ${error}`));
   } else if (typeof similarity === "number") {
     const status = similarity >= 95 ? chalk.green("Pass") : chalk.red("Fail");
-    console.log(
-      `${status} Page: ${pagePath} - Similarity: ${similarity.toFixed(2)}%`
-    );
+    console.log(`${status} Page: ${pagePath} - Similarity: ${similarity.toFixed(2)}%`);
   } else {
-    console.log(
-      chalk.yellow(`[Unknown] Page: ${pagePath} - ${similarity || "Unknown"}`)
-    );
+    console.log(chalk.yellow(`[Unknown] Page: ${pagePath} - ${similarity || "Unknown"}`));
   }
 }
 
